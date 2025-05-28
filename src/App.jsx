@@ -5,7 +5,7 @@ import { OrbitControls } from "https://cdn.skypack.dev/three-stdlib@2.8.5/contro
 import { RGBELoader } from "https://cdn.skypack.dev/three-stdlib@2.8.5/loaders/RGBELoader";
 import { mergeBufferGeometries } from "https://cdn.skypack.dev/three-stdlib@2.8.5/utils/BufferGeometryUtils";
 import SimplexNoise from "https://cdn.skypack.dev/simplex-noise@3.0.0";
-import { tileToPosition } from "../utils/gridUtils.js";
+import { tileToPosition } from "./utils/gridUtils.js";
 import {
   ASSETS,
   MAX_HEIGHT,
@@ -25,9 +25,12 @@ import {
   createMapContainerMesh,
   createMapFloorMesh,
 } from "../three/meshUtils.js";
+import Stats from '../three/libs/stats.module.js';
 
 function App() {
   const mountRef = useRef();
+  const clockRef = useRef(new THREE.Clock()); // Added clockRef
+  const statsRef = useRef(null);
   const bigStoneSpriteRef = useRef(null);
   const currentBigStoneHexRef = useRef(null);
   const hexagonDataRef = useRef([]);
@@ -39,6 +42,7 @@ function App() {
   const interactiveMeshesRef = useRef([]);
 
   const handleMoveToCenterClick = () => {
+    console.log("Move to center button clicked.");
     if (!hexagonDataRef.current || hexagonDataRef.current.length === 0) {
       console.warn("Hexagon data not available.");
       return;
@@ -51,6 +55,7 @@ function App() {
       console.warn("Big stone sprite not available.");
       return;
     }
+    console.log("Current big stone hex:", currentBigStoneHexRef.current ? currentBigStoneHexRef.current.id : 'None');
 
     let centerHex = hexagonDataRef.current.find(h => h.gridX === 0 && h.gridY === 0);
 
@@ -65,6 +70,7 @@ function App() {
         }
       });
     }
+    console.log("Center hex identified:", centerHex);
 
     if (centerHex && currentBigStoneHexRef.current && currentBigStoneHexRef.current.id !== centerHex.id) {
       const returnedPath = findPathAStar(
@@ -85,16 +91,17 @@ function App() {
         );
         bigStoneProgressRef.current = 0;
         bigStoneCurrentPathSegmentRef.current = 0;
-        console.log("Moving big stone to center hex:", centerHex.id);
+        console.log("Path found for big stone to center. Target:", centerHex.id, "Path length:", bigStonePathRef.current.length);
       } else {
-        console.log("No path found to center hex or already at center.");
+        console.log("No path to center found or stone already at center.");
         bigStonePathRef.current = [];
         bigStoneHexDataPathRef.current = [];
       }
     } else if (centerHex && currentBigStoneHexRef.current && currentBigStoneHexRef.current.id === centerHex.id) {
       console.log("Big stone is already at the center hex.");
     } else {
-      console.warn("Could not determine center hex or current stone position.");
+      // This case might be hit if centerHex is null after fallback, though unlikely with current fallback.
+      console.warn("Could not determine center hex, or other issue in handleMoveToCenterClick.");
     }
   };
 
@@ -121,7 +128,7 @@ function App() {
 
       // Helper to initialize core scene and camera
       const initializeCoreScene = () => {
-        // console.log("Initializing core scene and camera...");
+        console.log("Initializing core scene...");
         sceneRef.current = new THREE.Scene();
         sceneRef.current.background = new THREE.Color("#FFEECC");
         camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
@@ -130,19 +137,31 @@ function App() {
 
       // Helper to initialize the WebGL renderer
       const initializeRenderer = () => {
-        // console.log("Initializing renderer...");
+        console.log("Initializing renderer...");
         renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(width, height);
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.physicallyCorrectLights = true;
+        renderer.useLegacyLights = false; // Modern equivalent of physicallyCorrectLights
         renderer.shadowMap.enabled = true;
+        // THREE.PCFSoftShadowMap provides softer shadows but is more performance-intensive.
+        // Consider THREE.PCFShadowMap or THREE.BasicShadowMap if FPS is an issue.
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        container.appendChild(renderer.domElement);
+        container.appendChild(renderer.domElement); // renderer.domElement is the canvas
+
+        // Initialize Stats.js
+        statsRef.current = new Stats();
+        statsRef.current.showPanel(0); // 0: fps, 1: ms, 2: mb
+        statsRef.current.dom.style.position = 'absolute';
+        statsRef.current.dom.style.top = '0px';
+        statsRef.current.dom.style.left = '80px'; // Position next to the other button
+        mountRef.current.appendChild(statsRef.current.dom); // Add stats panel to the main container
+
+        console.log("Renderer and Stats initialized.");
       };
 
       // Helper to set up scene lighting
       const setupLighting = () => {
-        // console.log("Setting up lights...");
+        console.log("Setting up lights...");
         const light = new THREE.PointLight(
           new THREE.Color("#FFCB8E").convertSRGBToLinear().convertSRGBToLinear(),
           80,
@@ -155,22 +174,25 @@ function App() {
         light.shadow.camera.near = 0.5;
         light.shadow.camera.far = 500;
         sceneRef.current.add(light);
+        console.log("Lighting setup complete.");
       };
 
       // Helper to set up orbit controls
       const setupControls = () => {
-        // console.log("Setting up controls...");
+        console.log("Setting up controls...");
         controls = new OrbitControls(camera, renderer.domElement);
         controls.target.set(0, 0, 0);
         controls.dampingFactor = 0.05;
         controls.enableDamping = true;
+        console.log("Controls setup complete.");
       };
       
       // Helper to set up PMREM Generator
       const setupPMREM = () => {
-        // console.log("Setting up PMREM...");
+        console.log("Setting up PMREM...");
         pmrem = new THREE.PMREMGenerator(renderer);
         pmrem.compileEquirectangularShader();
+        console.log("PMREM setup complete.");
       };
 
       // Variables for texture loading
@@ -181,27 +203,21 @@ function App() {
 
       // Helper to load all textures
       const loadAllTextures = async () => {
-        // console.log("Loading textures..."); // Retaining for debug, can be removed
+        console.log("Starting texture loading...");
         try {
-          // console.log("Attempting to load HDR envmap via loadAsync..."); // Retaining for debug
-          // Pass loadingManager to RGBELoader if its progress should be tracked by it.
-          // However, since we await all, it's not strictly necessary for onLoad.
           const hdrTexture = await new RGBELoader().loadAsync(ASSETS.envmap); 
           textures.envmap = hdrTexture;
-          // console.log("HDR envmap loaded successfully:", textures.envmap); // Retaining for debug
         } catch (error) {
           console.error("Failed to load HDR envmap with loadAsync:", error);
         }
         
-        // Load regular textures
-        // These textureLoader.loadAsync calls are independent promises.
         textures.dirt = await textureLoader.loadAsync(ASSETS.dirt);
         textures.dirt2 = await textureLoader.loadAsync(ASSETS.dirt2);
         textures.grass = await textureLoader.loadAsync(ASSETS.grass);
         textures.sand = await textureLoader.loadAsync(ASSETS.sand);
         textures.water = await textureLoader.loadAsync(ASSETS.water);
         textures.stone = await textureLoader.loadAsync(ASSETS.stone);
-        // console.log("Regular textures loaded."); // Retaining for debug
+        console.log("All textures loaded.");
       };
       
       // --- Main setup flow ---
@@ -217,16 +233,13 @@ function App() {
 
       // Callback function to continue scene setup after textures are loaded
       const onRegularTexturesLoaded = () => {
-        // console.log("All textures loaded, proceeding with scene setup..."); // Retaining for debug
+        console.log("Processing textures and initializing scene elements...");
         if (!textures.envmap || typeof textures.envmap.mapping === "undefined") {
           console.error("HDR envmap (ASSETS.envmap) not loaded or invalid, cannot proceed with PMREM processing.", textures.envmap);
-          // Consider a fallback or error display here
           return; 
         }
-        // Process the HDR environment map
         envmap = pmrem.fromEquirectangular(textures.envmap).texture;
 
-        // Geometry accumulators for terrain types
         let stoneGeo = new THREE.BoxGeometry(0,0,0);
         let dirtGeo = new THREE.BoxGeometry(0,0,0);
         let dirt2Geo = new THREE.BoxGeometry(0,0,0);
@@ -234,7 +247,7 @@ function App() {
         let grassGeo = new THREE.BoxGeometry(0,0,0);
 
         // Terrain Generation
-        // console.log("Generating terrain data and geometries...");
+        console.log("Terrain generation started.");
         const simplex = new SimplexNoise();
         for (let i = -45; i <= 45; i++) {
           for (let j = -45; j <= 45; j++) {
@@ -274,18 +287,42 @@ function App() {
             hexagonDataRef.current.push({ gridX: i, gridY: j, worldPosition: position.clone(), height: hexHeight, materialType: materialType, id: `hex_${i}_${j}` });
           }
         }
+        console.log("Terrain generation complete. Number of hexagons:", hexagonDataRef.current.length);
 
         // Create and Add Terrain Meshes
-        // console.log("Creating and adding terrain meshes...");
         let stoneMesh = hexMesh(textures.stone && stoneGeo, textures.stone, envmap, THREE);
+        console.log("Stone mesh created:", stoneMesh ? stoneMesh.id : 'undefined');
+        if (stoneMesh) {
+          stoneMesh.frustumCulled = false;
+          console.log("Set stoneMesh.frustumCulled to false");
+        }
         let grassMesh = hexMesh(textures.grass && grassGeo, textures.grass, envmap, THREE);
+        console.log("Grass mesh created:", grassMesh ? grassMesh.id : 'undefined');
+        if (grassMesh) {
+          grassMesh.frustumCulled = false;
+          console.log("Set grassMesh.frustumCulled to false");
+        }
         let dirt2Mesh = hexMesh(textures.dirt2 && dirt2Geo, textures.dirt2, envmap, THREE);
+        console.log("Dirt2 mesh created:", dirt2Mesh ? dirt2Mesh.id : 'undefined');
+        if (dirt2Mesh) {
+          dirt2Mesh.frustumCulled = false;
+          console.log("Set dirt2Mesh.frustumCulled to false");
+        }
         let dirtMesh = hexMesh(textures.dirt && dirtGeo, textures.dirt, envmap, THREE);
+        console.log("Dirt mesh created:", dirtMesh ? dirtMesh.id : 'undefined');
+        if (dirtMesh) {
+          dirtMesh.frustumCulled = false;
+          console.log("Set dirtMesh.frustumCulled to false");
+        }
         let sandMesh = hexMesh(textures.sand && sandGeo, textures.sand, envmap, THREE);
+        console.log("Sand mesh created:", sandMesh ? sandMesh.id : 'undefined');
+        if (sandMesh) {
+          sandMesh.frustumCulled = false;
+          console.log("Set sandMesh.frustumCulled to false");
+        }
         sceneRef.current.add(stoneMesh, dirtMesh, dirt2Mesh, sandMesh, grassMesh);
         
         // Create and Add Environment Meshes (Sea, Map Borders, Clouds)
-        // console.log("Creating and adding environment meshes...");
         const seaMesh = createSeaMesh(textures, envmap, MAX_HEIGHT, THREE);
         sceneRef.current.add(seaMesh);
         const mapContainer = createMapContainerMesh(textures, envmap, MAX_HEIGHT, THREE);
@@ -296,8 +333,9 @@ function App() {
         sceneRef.current.add(cloudsMesh);
 
         // Initialize Big Stone Sprite
-        // console.log("Initializing big stone sprite...");
-        const bigStoneSpeed = 0.05; 
+        const bigStoneSpeedUnitsPerSecond = 1.0; // Speed in units (segments) per second
+        const yPositionSmoothingFactor = 0.2; // Smoothing factor for Y position updates
+        // const bigStoneSpeed = 0.05; // Old constant, effectively removed/replaced
         const bigSpriteGeo = new THREE.SphereGeometry(0.8, 12, 10);
         const bigSpriteMat = new THREE.MeshStandardMaterial({ color: 0x6c757d, roughness: 0.7, metalness: 0.3 });
         bigStoneSpriteRef.current = new THREE.Mesh(bigSpriteGeo, bigSpriteMat);
@@ -307,18 +345,19 @@ function App() {
           currentBigStoneHexRef.current = hexagonDataRef.current[0];
           bigStoneSpriteRef.current.position.set( currentBigStoneHexRef.current.worldPosition.x, currentBigStoneHexRef.current.height + 0.8, currentBigStoneHexRef.current.worldPosition.y);
           sceneRef.current.add(bigStoneSpriteRef.current);
+          console.log("Big stone sprite initialized at:", bigStoneSpriteRef.current.position);
         } else {
           console.warn("No hexagons available to place the big stone sprite.");
           bigStoneSpriteRef.current = null;
         }
 
         // Setup Interactions (Raycasting and Click Events)
-        // console.log("Setting up interactions...");
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         interactiveMeshesRef.current = [stoneMesh, dirtMesh, dirt2Mesh, sandMesh, grassMesh].filter(mesh => mesh && mesh.geometry && mesh.geometry.index !== null);
 
         onCanvasClick = (event) => {
+          console.log("Canvas clicked. Mouse coordinates:", mouse.x, mouse.y);
           const rect = renderer.domElement.getBoundingClientRect();
           mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
           mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -326,6 +365,7 @@ function App() {
           const intersects = raycaster.intersectObjects(interactiveMeshesRef.current);
           if (intersects.length > 0) {
             const intersectionPoint = intersects[0].point;
+            console.log("Intersection point:", intersectionPoint);
             let closestHex = null;
             let minDistanceSq = Infinity;
             hexagonDataRef.current.forEach((hex) => {
@@ -337,8 +377,8 @@ function App() {
                 closestHex = hex;
               }
             });
+            console.log("Closest hex identified:", closestHex);
             if (closestHex && minDistanceSq < 2 * 2) {
-              // console.log("Target Hexagon Selected:", closestHex);
               if (bigStoneSpriteRef.current && currentBigStoneHexRef.current && currentBigStoneHexRef.current.id !== closestHex.id) {
                 const returnedPath = findPathAStar(currentBigStoneHexRef.current, closestHex, hexagonDataRef.current);
                 if (returnedPath && returnedPath.length > 0) {
@@ -346,9 +386,9 @@ function App() {
                   bigStonePathRef.current = bigStoneHexDataPathRef.current.map(hex => new THREE.Vector3(hex.worldPosition.x, hex.height + 0.8, hex.worldPosition.y));
                   bigStoneProgressRef.current = 0;
                   bigStoneCurrentPathSegmentRef.current = 0;
-                  // console.log("A* Path for big stone found, target:", closestHex.id, "Path length:", bigStoneHexDataPathRef.current.length);
+                  console.log("Path found for big stone. Target:", closestHex.id, "Path length:", bigStonePathRef.current.length);
                 } else {
-                  // console.log("No path found or target is current hex.");
+                  console.log("No path found or target is current hex.");
                   bigStonePathRef.current = [];
                   bigStoneHexDataPathRef.current = [];
                 }
@@ -361,45 +401,82 @@ function App() {
         }
 
         // Animation Loop
-        // console.log("Starting animation loop...");
         function animate() {
+          const deltaTime = clockRef.current.getDelta(); // Get delta time
+          statsRef.current.begin(); // Begin FPS/MS monitoring
+
           controls.update();
           if (bigStoneSpriteRef.current && bigStonePathRef.current.length > 0 && bigStoneCurrentPathSegmentRef.current < bigStonePathRef.current.length - 1) {
             const currentSegmentStart = bigStonePathRef.current[bigStoneCurrentPathSegmentRef.current];
             const currentSegmentEnd = bigStonePathRef.current[bigStoneCurrentPathSegmentRef.current + 1];
-            bigStoneProgressRef.current += bigStoneSpeed;
+            bigStoneProgressRef.current += bigStoneSpeedUnitsPerSecond * deltaTime; // Frame-rate independent progress
+            console.log("Big stone moving. Current segment:", bigStoneCurrentPathSegmentRef.current, "Progress:", bigStoneProgressRef.current); // Added this log
             if (bigStoneProgressRef.current >= 1.0) {
               bigStoneProgressRef.current = 0;
               bigStoneCurrentPathSegmentRef.current++;
               if (bigStoneHexDataPathRef.current[bigStoneCurrentPathSegmentRef.current]) {
                 currentBigStoneHexRef.current = bigStoneHexDataPathRef.current[bigStoneCurrentPathSegmentRef.current];
+                console.log("Big stone reached segment end. New current hex:", currentBigStoneHexRef.current ? currentBigStoneHexRef.current.id : 'None');
               } else {
                 if (bigStoneCurrentPathSegmentRef.current >= bigStonePathRef.current.length - 1 && bigStonePathRef.current.length > 0) {
                   const lastPathPoint = bigStonePathRef.current[bigStonePathRef.current.length - 1];
                   currentBigStoneHexRef.current = hexagonDataRef.current.find(h => h.worldPosition.x === lastPathPoint.x && h.worldPosition.y === lastPathPoint.z);
+                  console.log("Big stone reached segment end (fallback). New current hex:", currentBigStoneHexRef.current ? currentBigStoneHexRef.current.id : 'None');
                 }
               }
               if (bigStoneCurrentPathSegmentRef.current >= bigStonePathRef.current.length - 1) {
-                // console.log("Big stone reached destination:", currentBigStoneHexRef.current ? currentBigStoneHexRef.current.id : "Unknown");
+                console.log("Big stone reached final destination:", currentBigStoneHexRef.current ? currentBigStoneHexRef.current.id : 'None');
                 bigStonePathRef.current = [];
                 bigStoneHexDataPathRef.current = [];
               }
             }
             if (bigStonePathRef.current.length > 0 && bigStoneCurrentPathSegmentRef.current < bigStonePathRef.current.length - 1) {
               bigStoneSpriteRef.current.position.lerpVectors(currentSegmentStart, currentSegmentEnd, bigStoneProgressRef.current);
-              const downRaycaster = new THREE.Raycaster(new THREE.Vector3(bigStoneSpriteRef.current.position.x, MAX_HEIGHT + 1, bigStoneSpriteRef.current.position.z), new THREE.Vector3(0, -1, 0));
+              
+              // Y-Positioning via downward raycast (mid-path)
+              console.log("Big stone LERPed Y (mid-path):", bigStoneSpriteRef.current.position.y);
+              const downRaycaster = new THREE.Raycaster(
+                new THREE.Vector3(
+                  bigStoneSpriteRef.current.position.x,
+                  bigStoneSpriteRef.current.position.y + 2.0, // Modified Y origin
+                  bigStoneSpriteRef.current.position.z
+                ),
+                new THREE.Vector3(0, -1, 0)
+              );
               const terrainIntersects = downRaycaster.intersectObjects(interactiveMeshesRef.current, false);
               if (terrainIntersects.length > 0) {
-                bigStoneSpriteRef.current.position.y = terrainIntersects[0].point.y + 0.8;
+                const targetY = terrainIntersects[0].point.y + 0.8;
+                bigStoneSpriteRef.current.position.y = THREE.MathUtils.lerp(
+                    bigStoneSpriteRef.current.position.y,
+                    targetY,
+                    yPositionSmoothingFactor
+                );
+                console.log("Big stone raycast hit (mid-path). Smoothed New Y:", bigStoneSpriteRef.current.position.y);
               } else {
                 // console.warn("Downward raycast for Y-positioning missed terrain at XZ:", bigStoneSpriteRef.current.position.x, bigStoneSpriteRef.current.position.z, "Maintaining Y from lerp/previous.");
               }
             } else if (bigStonePathRef.current.length > 0 && bigStoneCurrentPathSegmentRef.current === bigStonePathRef.current.length - 1) {
               bigStoneSpriteRef.current.position.copy(bigStonePathRef.current[bigStoneCurrentPathSegmentRef.current]);
-              const finalHexYRaycaster = new THREE.Raycaster(new THREE.Vector3(bigStoneSpriteRef.current.position.x, MAX_HEIGHT + 1, bigStoneSpriteRef.current.position.z), new THREE.Vector3(0, -1, 0));
+
+              // Ensure Y is correct on the final hex as well
+              console.log("Big stone LERPed Y (final hex):", bigStoneSpriteRef.current.position.y);
+              const finalHexYRaycaster = new THREE.Raycaster(
+                new THREE.Vector3(
+                  bigStoneSpriteRef.current.position.x,
+                  bigStoneSpriteRef.current.position.y + 2.0, // Modified Y origin
+                  bigStoneSpriteRef.current.position.z
+                ),
+                new THREE.Vector3(0, -1, 0)
+              );
               const finalTerrainIntersects = finalHexYRaycaster.intersectObjects(interactiveMeshesRef.current, false);
               if (finalTerrainIntersects.length > 0) {
-                bigStoneSpriteRef.current.position.y = finalTerrainIntersects[0].point.y + 0.8;
+                const targetY = finalTerrainIntersects[0].point.y + 0.8;
+                bigStoneSpriteRef.current.position.y = THREE.MathUtils.lerp(
+                    bigStoneSpriteRef.current.position.y,
+                    targetY,
+                    yPositionSmoothingFactor
+                );
+                console.log("Big stone raycast hit (final hex). Smoothed New Y:", bigStoneSpriteRef.current.position.y);
               } else {
                 // console.warn("Downward raycast for Y-positioning (FINAL HEX) missed terrain at XZ:", bigStoneSpriteRef.current.position.x, bigStoneSpriteRef.current.position.z);
               }
@@ -413,14 +490,14 @@ function App() {
             }
           }
           renderer.render(sceneRef.current, camera);
+          
+          statsRef.current.end(); // End FPS/MS monitoring
           animationId = requestAnimationFrame(animate);
         }
+        console.log("Scene setup complete. Starting animation loop.");
         animate();
       };
       
-      // Directly call onRegularTexturesLoaded as all awaited texture loads are complete.
-      // The loadingManager isn't strictly necessary here if all loads are awaited.
-      // If RGBELoader was the only one using loadingManager, its onLoad would be for that one texture.
       onRegularTexturesLoaded();
 
       // Return the actual cleanup function for useEffect

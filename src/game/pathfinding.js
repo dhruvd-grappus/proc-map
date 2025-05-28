@@ -38,6 +38,7 @@ function getHexNeighbors(currentHex, allHexData) {
 }
 
 function findPathAStar(startHex, endHex, allHexData) {
+  console.log("A* Pathfinding: Start:", startHex.id, "End:", endHex.id);
   let openSet = [startHex];
   const cameFrom = new Map(); // Stores the previous hex in the optimal path
 
@@ -61,6 +62,7 @@ function findPathAStar(startHex, endHex, allHexData) {
         current = cameFrom.get(current.id);
         totalPath.unshift(current);
       }
+              console.log("A* Pathfinding: Path found. Length:", totalPath.length);
       return totalPath;
     }
 
@@ -80,6 +82,7 @@ function findPathAStar(startHex, endHex, allHexData) {
       }
     });
   }
+          console.log("A* Pathfinding: No path found.");
   return null; // No path found
 }
 
