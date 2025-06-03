@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "https://cdn.skypack.dev/*": ["node_modules/@types/*"] // This is a common pattern, but won't work directly for skypack without local types.
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}
