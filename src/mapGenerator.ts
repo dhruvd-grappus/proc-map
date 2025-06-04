@@ -241,19 +241,20 @@ export function createMap(
                 if (!hex) continue;
                 // Draw outline
                 const corners = getHexCorners(hex.worldPos, 1); // radius 1
-                const points = corners.map((c: THREE.Vector2) => new THREE.Vector3(c.x, hex.baseHeight + 0.01, c.y));
+                const points = corners.map((c: THREE.Vector2) => new THREE.Vector3(c.x - hex.worldPos.x, hex.baseHeight + 0.01, c.y - hex.worldPos.y));
                 points.push(points[0].clone()); // close the loop
                 const geometry = new THREE.BufferGeometry().setFromPoints(points);
                 const material = new THREE.LineBasicMaterial({ color, linewidth: 2 });
                 const line = new THREE.Line(geometry, material);
+                line.position.set(hex.worldPos.x, 0, hex.worldPos.y);
                 line.frustumCulled = false;
                 scene.add(line);
                 // Draw transparent overlay for all_hexes (less opaque than key_hexes)
                 const shape = new THREE.Shape(corners.map((c: THREE.Vector2) => new THREE.Vector2(c.x, c.y)));
                 const overlayGeometry = new THREE.ShapeGeometry(shape);
-                const overlayMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.18, depthWrite: false });
+                const overlayMaterial = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false });
                 const overlayMesh = new THREE.Mesh(overlayGeometry, overlayMaterial);
-                overlayMesh.position.set(0, hex.baseHeight + 0.015, 0); // slightly above the hex
+                overlayMesh.position.set(0, hex.baseHeight + 0.015, 0);
                 overlayMesh.frustumCulled = false;
                 scene.add(overlayMesh);
             }
@@ -266,10 +267,9 @@ export function createMap(
                 const corners = getHexCorners(hex.worldPos, 1);
                 const shape = new THREE.Shape(corners.map((c: THREE.Vector2) => new THREE.Vector2(c.x, c.y)));
                 const geometry = new THREE.ShapeGeometry(shape);
-                geometry.translate(0, 0, 0); // already in world coords
-                const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.35, depthWrite: false });
+                const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false });
                 const mesh = new THREE.Mesh(geometry, material);
-                mesh.position.set(0, hex.baseHeight + 0.02, 0); // slightly above the hex
+                mesh.position.set(0, hex.baseHeight + 0.02, 0);
                 mesh.frustumCulled = false;
                 scene.add(mesh);
             }
