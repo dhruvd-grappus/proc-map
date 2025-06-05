@@ -20,7 +20,8 @@ interface Core {
 
 export function initCore(): Core {
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#FFEECC");
+    scene.background = new THREE.Color(0xffffff);
+    scene.environment = null;
 
     const world = new CANNON.World({
         gravity: new CANNON.Vec3(0, -9.82, 0),
@@ -51,16 +52,26 @@ export function initCore(): Core {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = PCFSoftShadowMap;
-    
+
     const appElement = document.querySelector("#app");
     if (!appElement) throw new Error("Could not find #app element");
     appElement.appendChild(renderer.domElement);
+
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+    hemiLight.position.set(0, 300, 0);
+    scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(75, 300, -75);
+    scene.add(dirLight);
 
     const light = new THREE.PointLight(new THREE.Color("#FFCB8E").convertSRGBToLinear(),5000, 5000);
     light.position.set(10, 30, 10);
     light.castShadow = true;
     light.shadow.mapSize.width = 512;
     light.shadow.mapSize.height = 512;
+    light.shadow.bias = -0.0005;
+    light.shadow.normalBias = 0.02;
     scene.add(light);
 
     const controls = new OrbitControls(camera, renderer.domElement);

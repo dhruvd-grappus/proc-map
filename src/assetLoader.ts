@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { TextureLoader } from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 export async function loadAssets(pmrem: { fromEquirectangular: (arg0: THREE.DataTexture) => any; }) {
     const envmapTexture: THREE.DataTexture = await new RGBELoader().loadAsync("assets/envmap.hdr");
@@ -24,5 +25,9 @@ export async function loadAssets(pmrem: { fromEquirectangular: (arg0: THREE.Data
     const mapDataResponse = await fetch("assets/gettysburg_map_data.json");
     const loadedMapData = await mapDataResponse.json();
 
-    return { envmap, textures, loadedMapData };
+    const gltfLoader = new GLTFLoader();
+    const treeGLB = await gltfLoader.loadAsync('assets/tree.glb');
+    const infantryGLB = await gltfLoader.loadAsync('assets/infantry.glb');
+
+    return { envmap, textures, loadedMapData, treeGLB, infantryGLB };
 }
