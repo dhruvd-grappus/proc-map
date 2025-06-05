@@ -70,7 +70,7 @@ async function main(): Promise<void> {
 
     createMap(core.scene, core.world, assets.loadedMapData, assets.textures, assets.envmap, core.defaultMaterial);
 
-    allPhysicalSpheres = createSpheres(core.scene, core.world, assets.envmap, core.defaultMaterial, assets.infantryGLB);
+    allPhysicalSpheres = createSpheres(core.scene, core.world, core.defaultMaterial, assets.infantryGLB);
     playerSphere = allPhysicalSpheres.find(s => s.isPlayer);
 
     console.log(allPhysicalSpheres, "allPhysicalSpheres");

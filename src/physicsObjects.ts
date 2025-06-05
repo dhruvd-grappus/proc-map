@@ -12,7 +12,7 @@ export interface Sphere {
 export function createSpheres(
     scene: THREE.Scene,
     world: CANNON.World,
-    envmap: THREE.Texture,
+   
     defaultMaterial: CANNON.Material,
     infantryGLB: any
 ): Sphere[] {
