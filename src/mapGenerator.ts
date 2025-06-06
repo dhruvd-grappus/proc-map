@@ -347,8 +347,8 @@ export async function creatBatchedMesh(scene: THREE.Scene, hexes: HexInfo[]) {
     for (const hex of instancesToAdd) {
         const id = batchedMesh.addInstance(geometryId);
 
-        const randomScale = 0.008;
-        const treeHeight = treeSize.z * randomScale;
+       
+
         position.set(hex.position.x, hex.height - 0.9, hex.position.y);
 
         rotation.x = -Math.PI / 2;
