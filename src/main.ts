@@ -6,7 +6,7 @@ import Stats from 'stats.js';
 import { TIME_STEP, RANDOM_MOVEMENT_PROBABILITY, RANDOM_IMPULSE_STRENGTH } from './config.ts';
 import { initCore } from './setup.ts';
 import { loadAssets } from './assetLoader.ts';
-import { createMap, hexDataMap, allHexMeshes, instancedMeshes as mapInstancedMeshes } from './mapGenerator.ts';
+import { createMap, hexDataMap, allHexMeshes, instancedMeshes as mapInstancedMeshes, creatBatchedMesh } from './mapGenerator.ts';
 import { createSpheres, Sphere } from './physicsObjects.ts';
 import { setupMouseControls } from './interaction.ts';
 import { updateHexLiftAnimation, updateSpherePathAnimation } from './animation.ts';
@@ -68,7 +68,7 @@ async function main(): Promise<void> {
 
     console.log(assets);
 
-    createMap(core.scene, core.world, assets.loadedMapData, assets.textures, assets.envmap, core.defaultMaterial);
+    await createMap(core.scene, core.world, assets.loadedMapData, assets.textures, assets.envmap, core.defaultMaterial);
 
     allPhysicalSpheres = createSpheres(core.scene, core.world, core.defaultMaterial, assets.infantryGLB);
     playerSphere = allPhysicalSpheres.find(s => s.isPlayer);
