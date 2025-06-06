@@ -10,14 +10,22 @@ export interface AnimationState {
     sphereAnimationTargetPos: CANNON.Vec3;
     currentPath: PathNode[];
     currentPathIndex: number;
+    activeSpheres: {
+        [sphereId: string]: {
+            isAnimating: boolean;
+            startTime: number;
+            startPos: CANNON.Vec3;
+            targetPos: CANNON.Vec3;
+            currentPath: any[];
+            currentPathIndex: number;
+        }
+    };
 }
 
 export interface LiftedHexInfo {
-    instancedMesh: THREE.InstancedMesh;
-    instanceId: number;
-    originalMatrix: THREE.Matrix4;
-    liftStartTime: number;
-    yOffset: number;
+    hexData: any;
+    startTime: number;
+    originalY: number;
 }
 
 export interface PathNode {

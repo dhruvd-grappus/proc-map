@@ -1,19 +1,27 @@
 // physicsObjects.ts
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { MAX_HEIGHT, NUM_ADDITIONAL_SPHERES } from './config.ts';
+import { MAX_HEIGHT } from './config.ts';
+import { HexData } from './mapGenerator.ts';
 
 export interface Sphere {
     body: CANNON.Body;
     mesh: THREE.Mesh;
     isPlayer: boolean;
+    id: string;
 }
 
 export function createSpheres(
     scene: THREE.Scene,
     world: CANNON.World,
     envmap: THREE.Texture,
-    defaultMaterial: CANNON.Material
+    defaultMaterial: CANNON.Material,
+    hexDataMap: Map<string, HexData>,
+    tileX?: number,
+    tileY?: number,
+    color: number = 0xff0000,
+    id: string = "",
+    isPlayer: boolean = false
 ): Sphere[] {
     const sphereRadius = 1;
     const spheres: Sphere[] = [];
@@ -28,7 +36,7 @@ export function createSpheres(
         linearDamping: 0.4,
         angularDamping: 0.4,
         fixedRotation: false,
-        collisionResponse: true
+        collisionResponse: false
     }) as CANNON.Body & {
         ccdSpeedThreshold: number;
         ccdSweptSphereRadius: number;
@@ -38,19 +46,44 @@ export function createSpheres(
     sphereBody.ccdSweptSphereRadius = 0.05;
     sphereBody.sleepSpeedLimit = 0.2;
     sphereBody.sleepTimeLimit = 0.5;
-    sphereBody.position.set(0, Math.max(MAX_HEIGHT + sphereRadius + 0.2, surfaceHeight), 0); // Start high
+
+    // Sphere initial position
+
+    if(tileX && tileY) {
+        const hexData = hexDataMap.get(`${tileX},${tileY}`);
+  
+        if (!hexData) {
+            console.warn(`No hex found at tile position (${tileX}, ${tileY})`);
+        
+        }
+
+        if(hexData) {
+    
+        const worldPos = hexData.worldPos;
+    
+        sphereBody.position.set(worldPos.x, Math.max(MAX_HEIGHT + sphereRadius + 0.2, surfaceHeight), worldPos.y); 
+        }
+    } else {
+        sphereBody.position.set(0, Math.max(MAX_HEIGHT + sphereRadius + 0.2, surfaceHeight), 0); // Start high
+    }
+
+
+
+
+
     world.addBody(sphereBody);
 
     const sphereGeometry = new THREE.SphereGeometry(sphereRadius);
-    const baseSphereMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000, envMap: envmap });
+    const baseSphereMaterial = new THREE.MeshStandardMaterial({ color, envMap: envmap });
     const sphereMesh = new THREE.Mesh(sphereGeometry, baseSphereMaterial.clone());
     sphereMesh.castShadow = true;
     sphereMesh.receiveShadow = true;
     sphereMesh.position.copy(sphereBody.position);
     scene.add(sphereMesh);
-    spheres.push({ body: sphereBody, mesh: sphereMesh, isPlayer: true });
+    return [{ body: sphereBody, mesh: sphereMesh, isPlayer, id }];
 
     // Additional Spheres
+    /*
     for (let i = 0; i < NUM_ADDITIONAL_SPHERES; i++) {
         const additionalRadius = sphereRadius; // Same radius for now
         const body = new CANNON.Body({
@@ -85,6 +118,7 @@ export function createSpheres(
         scene.add(mesh);
         spheres.push({ body, mesh, isPlayer: false });
     }
+    */
 
     return spheres;
 }

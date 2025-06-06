@@ -76,6 +76,7 @@ export function createMap(
     let minI = Infinity, maxI = -Infinity, minJ = Infinity, maxJ = -Infinity;
 
     if (loadedMapData?.hex_data) {
+     
         for (const tile of loadedMapData.hex_data) {
             const coords = tile.coord.split(',');
             const tileX = parseInt(coords[0], 10);

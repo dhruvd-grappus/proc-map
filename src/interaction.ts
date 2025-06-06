@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { JUMP_FORCE } from './config.ts';
 import { aStarPathfinding, worldPointToHex } from './pathfinding.ts';
-import { startHexLift, startSpherePath } from './animation.ts';
+import { startHexLift, startSpherePath, SphereAnimationState } from './animation.ts';
 import { Sphere } from './physicsObjects.ts';
 import { AnimationState } from './types/index.ts';
 
@@ -26,14 +26,13 @@ export function setupMouseControls(
     world: CANNON.World,
     allHexMeshesFromMap: THREE.InstancedMesh[],
     hexDataMapFromMap: Map<string, HexData>,
-    instancedMeshesFromMap: Record<string, THREE.InstancedMesh>,
     playerSphere: PlayerSphere,
     animationState: AnimationState
 ): void {
     const mouse: THREE.Vector2 = new THREE.Vector2();
 
     rendererDomElement.addEventListener('mousedown', (event: MouseEvent) =>
-        onMouseDown(event, camera, world, allHexMeshesFromMap, hexDataMapFromMap, instancedMeshesFromMap, playerSphere, animationState, mouse), false);
+        onMouseDown(event, camera, world, allHexMeshesFromMap, hexDataMapFromMap, playerSphere, animationState, mouse), false);
     rendererDomElement.addEventListener('mouseup', onMouseUp, false);
     rendererDomElement.addEventListener('contextmenu', (event: MouseEvent) => event.preventDefault());
 
@@ -109,7 +108,6 @@ function onMouseDown(
     world: CANNON.World,
     allHexMeshes: THREE.InstancedMesh[],
     hexDataMap: Map<string, HexData>,
-    instancedMeshes: Record<string, THREE.InstancedMesh>,
     playerSphere: PlayerSphere,
     animationState: AnimationState,
     mouse: THREE.Vector2
@@ -142,6 +140,7 @@ function onMouseDown(
         }
 
         if (finalClickedHexData && !animationState.isHexLifting && !animationState.isSphereAnimating) {
+            console.log('finalClickedHexData', finalClickedHexData);
             const sphereCurrentHex = worldPointToHex(new THREE.Vector3(playerSphere.body.position.x, playerSphere.body.position.y, playerSphere.body.position.z), hexDataMap);
             let allowHexLift: boolean = true;
             if (sphereCurrentHex && sphereCurrentHex.tileX === finalClickedHexData.tileX && sphereCurrentHex.tileY === finalClickedHexData.tileY) {
@@ -149,14 +148,22 @@ function onMouseDown(
             }
 
             if (allowHexLift) {
-                startHexLift(finalClickedHexData, instancedMeshes, animationState);
+                startHexLift(finalClickedHexData, animationState);
             }
 
             if (sphereCurrentHex) {
                 const targetHexCoords = { tileX: finalClickedHexData.tileX, tileY: finalClickedHexData.tileY };
                 const path = aStarPathfinding(sphereCurrentHex, targetHexCoords, hexDataMap);
                 if (path.length > 0) {
-                    startSpherePath(world, path, playerSphere.body, animationState);
+                    const sphereAnim: SphereAnimationState = {
+                        isAnimating: true,
+                        startTime: performance.now(),
+                        startPos: playerSphere.body.position.clone(),
+                        targetPos: new CANNON.Vec3(),
+                        currentPath: path,
+                        currentPathIndex: 0
+                    };
+                    startSpherePath(path, playerSphere.body, sphereAnim);
                 }
             }
         }
