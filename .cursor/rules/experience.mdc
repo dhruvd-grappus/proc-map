@@ -1,0 +1,8 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+consider performance and code quality always
+
+always reuse assets or textures

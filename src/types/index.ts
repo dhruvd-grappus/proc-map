@@ -61,4 +61,6 @@ export interface Assets {
         stone: THREE.Texture;
     };
     loadedMapData: any; // Replace with actual map data type
-} 
+    treeGLB?: any;
+    infantryGLB?: any;
+}

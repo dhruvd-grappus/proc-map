@@ -1,6 +1,7 @@
 // mapGenerator.ts
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { tileToPosition, createHexMaterial } from './utils.ts';
 import { MAX_HEIGHT } from './config.ts';
 
@@ -62,19 +63,18 @@ export const allHexMeshes: THREE.InstancedMesh[] = [];
 // Store references to InstancedMesh objects by type
 export const instancedMeshes: { [key: string]: THREE.InstancedMesh } = {};
 
-export function createMap(
+export async function createMap(
     scene: THREE.Scene,
     world: CANNON.World,
     loadedMapData: LoadedMapData,
     textures: Textures,
     envmap: THREE.Texture,
     defaultMaterial: CANNON.Material
-): void {
+): Promise<void> {
     const allHexInfo: HexInfo[] = [];
     const groupedInstanceData: GroupedInstanceData = { stone: [], dirt: [], grass: [], sand: [], dirt2: [], water: [], grassNormal: [] };
 
     let minI = Infinity, maxI = -Infinity, minJ = Infinity, maxJ = -Infinity;
-
     if (loadedMapData?.hex_data) {
         for (const tile of loadedMapData.hex_data) {
             const coords = tile.coord.split(',');
@@ -109,6 +109,9 @@ export function createMap(
         allHexInfo.push({ i: 0, j: 0, position: tileToPosition(0,0), height: 1, materialType: "grass" });
         minI = 0; maxI = 0; minJ = 0; maxJ = 0;
     }
+
+    const grassHexes = allHexInfo.filter(h => h.materialType === 'grass');
+    await creatBatchedMesh(scene, grassHexes);
 
     const heightfieldMatrix: number[][] = [];
     const paddedMinI = minI - 1;
@@ -288,4 +291,77 @@ function getHexCorners(position: THREE.Vector2, radius = 1): THREE.Vector2[] {
         ));
     }
     return corners;
+}
+
+export async function creatBatchedMesh(scene: THREE.Scene, hexes: HexInfo[]) {
+    const loader = new GLTFLoader();
+    const gltf = await loader.loadAsync('assets/tree.glb');
+    let material: THREE.Material | undefined;
+    let geometry: THREE.BufferGeometry | undefined;
+    gltf.scene.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+            if (Array.isArray(child.material)) {
+                material = child.material[0];
+            } else {
+                material = child.material;
+            }
+            geometry = child.geometry;
+        }
+    });
+
+    if (!material || !geometry) {
+        console.error("Could not find mesh in tree.glb, aborting batched mesh creation.");
+        return;
+    }
+
+    geometry.computeBoundingBox();
+    const treeSize = new THREE.Vector3();
+    geometry.boundingBox!.getSize(treeSize);
+
+    const treeProbability = 0.8;
+    const instancesToAdd = hexes.filter(() => Math.random() < treeProbability).slice(0, 5000);
+    const maxInstanceCount = instancesToAdd.length;
+
+    if (maxInstanceCount === 0) {
+        return;
+    }
+
+    const maxVertexCount = geometry.attributes.position.count;
+    const maxIndexCount = geometry.index?.count ?? 0;
+
+    const batchedMesh = new THREE.BatchedMesh(
+        maxInstanceCount,
+        maxVertexCount,
+        maxIndexCount,
+        material
+    );
+
+    const geometryId = batchedMesh.addGeometry(geometry);
+
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const rotation = new THREE.Euler();
+    const quaternion = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+
+    for (const hex of instancesToAdd) {
+        const id = batchedMesh.addInstance(geometryId);
+
+       
+
+        position.set(hex.position.x, hex.height - 0.9, hex.position.y);
+
+        rotation.x = -Math.PI / 2;
+        rotation.y = 0;
+        rotation.z = 0;
+        quaternion.setFromEuler(rotation);
+
+        scale.set(0.008, 0.008, 0.008);
+
+        matrix.compose(position, quaternion, scale);
+
+        batchedMesh.setMatrixAt(id, matrix);
+    }
+
+    scene.add(batchedMesh);
 }

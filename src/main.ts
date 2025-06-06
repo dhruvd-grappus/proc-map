@@ -26,6 +26,7 @@ interface Assets {
     loadedMapData: any;
     textures: any;
     envmap: THREE.Texture;
+    infantryGLB: any;
 }
 
 interface AnimationState {
@@ -67,9 +68,9 @@ async function main(): Promise<void> {
 
     console.log(assets);
 
-    createMap(core.scene, core.world, assets.loadedMapData, assets.textures, assets.envmap, core.defaultMaterial);
+    await createMap(core.scene, core.world, assets.loadedMapData, assets.textures, assets.envmap, core.defaultMaterial);
 
-    allPhysicalSpheres = createSpheres(core.scene, core.world, assets.envmap, core.defaultMaterial);
+    allPhysicalSpheres = createSpheres(core.scene, core.world, core.defaultMaterial, assets.infantryGLB);
     playerSphere = allPhysicalSpheres.find(s => s.isPlayer);
 
     console.log(allPhysicalSpheres, "allPhysicalSpheres");
